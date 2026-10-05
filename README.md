@@ -1,10 +1,9 @@
 # Monica Server Stack
 
-[Monica](https://www.monicahq.com), the personal CRM, on a server, with an MCP server so AI tools can work with it: the people in a life, what happened with them, what to remember and when to get back in touch.
+Self-hosted [Monica](https://www.monicahq.com) 4 with an [MCP server](https://github.com/Jacob-Stokes/monica-mcp), in one Docker Compose project.
 
 [![e2e](https://github.com/Jacob-Stokes/monica-server-stack/actions/workflows/e2e.yml/badge.svg)](https://github.com/Jacob-Stokes/monica-server-stack/actions/workflows/e2e.yml)
 
-One Docker Compose project, everything in one folder:
 
 | Service | |
 |---|---|
@@ -15,7 +14,7 @@ One Docker Compose project, everything in one folder:
 | `monica-mcp` | [monica-mcp](https://github.com/Jacob-Stokes/monica-mcp): 14 tools for contacts, notes, activities, reminders and more, over Streamable HTTP with a bearer token (OAuth optional) |
 | `caddy`, `tailscale` or `cloudflared` | Optional HTTPS: Monica at the domain's root, the MCP server at `/mcp` |
 
-The fiddly parts of running Monica with an MCP server are done by the stack: the first account, an API token (a Passport personal access client, then a token, then renewing it before it expires a year later), the scheduler, and a rate limit high enough for an assistant (Monica's default is 60 requests a minute).
+Handled automatically: the first account, the MCP server's API token (created, and renewed before its one-year expiry), the reminder scheduler, and an API rate limit high enough for AI clients (Monica's default is 60 a minute).
 
 ## Install
 
