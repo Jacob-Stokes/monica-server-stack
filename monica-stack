@@ -19,7 +19,7 @@ set -euo pipefail
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   TTY=1
-  C_ACC=$'\033[38;5;141m' C_B=$'\033[1m' C_DIM=$'\033[2m' C_0=$'\033[0m'
+  C_ACC=$'\033[38;5;36m' C_B=$'\033[1m' C_DIM=$'\033[2m' C_0=$'\033[0m'
   C_OK=$'\033[38;5;78m' C_WARN=$'\033[38;5;221m' C_ERR=$'\033[38;5;203m'
 else
   TTY="" C_ACC="" C_B="" C_DIM="" C_0="" C_OK="" C_WARN="" C_ERR=""
@@ -146,7 +146,7 @@ pull() {
   printf '  %s%s%s Downloading %s  %schecking size…%s' "$C_ACC" "${SPIN[0]}" "$C_0" "$label" "$C_DIM" "$C_0"
   if [ -n "$arch" ]; then
     total="$(timeout 20 docker manifest inspect -v "$image" 2>/dev/null | awk -v a="\"architecture\": \"$arch\"" '
-      index($0, a) {f=1} f && /"layers"/ {l=1} l && /"size"/ {gsub(/[^0-9]/, ""); s += $0} l && /\]/ {print s+0; exit}')"
+      index($0, a) {f=1} f && /"layers"/ {l=1} l && /"size"/ {gsub(/[^0-9]/, ""); s += $0} l && /\]/ {print s+0; exit}')" || total=0
   fi
   printf '\033[?25l'
   local repo="${image%:*}" tag="${image##*:}"
@@ -188,19 +188,121 @@ pull() {
 # the progress bar back until the download had finished.
 AWK_LIVE=""; awk -W version 2>/dev/null | grep -qi mawk && AWK_LIVE="-W interactive"
 
-# no animated banner here; prompts and steps call these
-anim_on() { :; }
-anim_off() { :; }
-anim_stop() { :; }
+# The logo, as in the README: a panda's face in a two-tone hexagon, with two
+# green arrows going round it. Drawn in quarter-block characters (2x2 dots
+# each), generated from the logo's geometry by scripts/banner.mjs: per row,
+# each character as "foreground,background,glyph" (- for empty); then the
+# ring the arrows travel, as "row,column,dot bit" in order round it.
+BN_COLS=30 BN_ROWS=13
+BN_FACE=(
+  "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
+  "- - - - - - - - - - - 231,-,▗ 231,-,▄ 231,-,▟ 231,-,█ 254,-,█ 254,-,▙ 254,-,▄ 254,-,▖ - - - - - - - - - - -"
+  "- - - - - - - - 236,-,▄ 236,-,▖ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 236,-,▗ 236,-,▄ - - - - - - - -"
+  "- - - - - 236,-,▄ 236,-,▟ 236,-,█ 236,231,▘ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 236,254,▝ 236,-,█ 236,-,▙ 236,-,▄ - - - - -"
+  "- - - - - 236,-,█ 236,231,▛ 236,231,▘ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 236,254,▝ 236,254,▜ 236,-,█ - - - - -"
+  "- - - - - 236,231,▛ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 236,254,▜ - - - - -"
+  "- - - - - 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 236,231,▟ 236,-,█ 236,-,█ 231,-,█ 254,-,█ 236,-,█ 236,-,█ 236,254,▙ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ - - - - -"
+  "- - - - - 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 236,231,▐ 236,-,█ 236,-,█ 236,231,▀ 231,-,█ 254,-,█ 236,254,▀ 236,-,█ 236,-,█ 236,254,▌ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ - - - - -"
+  "- - - - - 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 236,231,▀ 236,254,▀ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ - - - - -"
+  "- - - - - 231,-,▀ 231,-,▜ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,▛ 254,-,▀ - - - - -"
+  "- - - - - - - - 231,-,▀ 231,-,▀ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 231,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,█ 254,-,▀ 254,-,▀ - - - - - - - -"
+  "- - - - - - - - - - - 231,-,▝ 231,-,▀ 231,-,▜ 231,-,█ 254,-,█ 254,-,▛ 254,-,▀ 254,-,▘ - - - - - - - - - - -"
+  "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
+)
+BN_PATH="-1,15,4 -1,15,8 0,15,2 0,16,1 0,16,2 0,17,1 0,17,4 0,17,8 0,18,4 0,18,8 0,19,4 1,19,1 1,19,2 1,20,1 1,20,2 1,20,8 1,21,4 1,21,8 1,22,4 1,22,8 2,22,2 2,23,1 2,23,2 2,24,1 2,24,4 2,24,8 2,25,4 2,25,8 2,26,4 3,26,1 3,26,2 3,26,8 4,26,2 4,26,8 5,26,2 5,26,8 6,26,2 6,26,8 7,26,2 7,26,8 8,26,2 8,26,8 9,26,2 9,26,8 9,26,4 10,26,1 10,25,2 10,25,1 10,24,2 10,24,1 10,24,4 10,23,8 10,23,4 10,22,8 11,22,2 11,22,1 11,21,2 11,21,1 11,20,2 11,20,8 11,20,4 11,19,8 11,19,4 12,19,1 12,18,2 12,18,1 12,17,2 12,17,1 12,17,4 12,16,8 12,16,4 12,15,8 13,15,2 13,15,1 13,14,2 13,14,1 12,14,4 12,13,8 12,13,4 12,12,8 12,12,2 12,12,1 12,11,2 12,11,1 12,10,2 11,10,8 11,10,4 11,9,8 11,9,4 11,9,1 11,8,2 11,8,1 11,7,2 11,7,1 10,7,4 10,6,8 10,6,4 10,5,8 10,5,2 10,5,1 10,4,2 10,4,1 10,3,2 9,3,8 9,3,4 9,3,1 8,3,4 8,3,1 7,3,4 7,3,1 6,3,4 6,3,1 5,3,4 5,3,1 4,3,4 4,3,1 3,3,4 3,3,1 3,3,2 2,3,8 2,4,4 2,4,8 2,5,4 2,5,8 2,5,2 2,6,1 2,6,2 2,7,1 1,7,4 1,7,8 1,8,4 1,8,8 1,9,4 1,9,1 1,9,2 1,10,1 1,10,2 0,10,8 0,11,4 0,11,8 0,12,4 0,12,8 0,12,2 0,13,1 0,13,2 0,14,1 -1,14,4 -1,14,8"
+BN_Q=(' ' ▘ ▝ ▀ ▖ ▌ ▞ ▛ ▗ ▚ ▐ ▜ ▄ ▙ ▟ █)
+read -ra BN_RING <<<"$BN_PATH"
+# banner_rows K: the banner's rows, with the arrows K quarter cells round the
+# ring from where they start. Each arrow is a run of quarter cells, bright at
+# its head and darker behind; the ring is otherwise empty.
+banner_rows() {
+  local k="$1" n=${#BN_RING[@]} len=$(( ${#BN_RING[@]} * 3 / 10 )) o="$C_0" r c i a p cell fg bg g line
+  local -A bits=() hot=()
+  for a in 0 $((n / 2)); do
+    for ((i = 0; i < len; i++)); do
+      IFS=, read -r r c p <<<"${BN_RING[(k + a - i + 2 * n) % n]}"
+      bits[$r,$c]=$(( ${bits[$r,$c]:-0} | p ))
+      ((i < len / 3)) && hot[$r,$c]=1
+    done
+  done
+  local text=("" "" "" "" "" "${C_B}monica-server-stack$o" "${C_DIM}Monica 4 with an MCP server,$o"
+    "${C_DIM}in one Docker Compose project$o" "" "" "" "" "")
+  for ((r = 0; r < BN_ROWS; r++)); do
+    read -ra cell <<<"${BN_FACE[r]}"
+    line="  "
+    for ((c = 0; c < BN_COLS; c++)); do
+      if [ -n "${bits[$r,$c]:-}" ]; then
+        if [ -n "${hot[$r,$c]:-}" ]; then line+=$'\033[38;5;42m'; else line+=$'\033[38;5;29m'; fi
+        line+="${BN_Q[${bits[$r,$c]}]}$o"
+      elif [ "${cell[c]}" = - ]; then line+=" "
+      else
+        IFS=, read -r fg bg g <<<"${cell[c]}"
+        line+=$'\033[38;5;'"$fg"m; [ "$bg" = - ] || line+=$'\033[48;5;'"$bg"m
+        line+="$g$o"
+      fi
+    done
+    printf '%s   %s\033[K\n' "$line" "${text[r]}"
+  done
+}
+BN_TOP=2   # the banner's first screen row
+BN_STEP=3  # quarter cells the arrows move per frame
 
+BANNER_SHOWN=""
 banner() {
+  BANNER_SHOWN=1
   [ -n "$TTY" ] || { printf '\nmonica-server-stack\n'; return; }
-  local a=$'\033[38;5;33m' b=$'\033[38;5;39m' o="$C_0"
+  # Interactive: start on a clean screen (the old contents scrolled into the
+  # scrollback, not erased), so the banner sits at the top and its arrows can
+  # go round there (anim_on).
+  if [ -z "$NONINTERACTIVE" ]; then
+    local rows; rows=$(stty size </dev/tty 2>/dev/null | cut -d' ' -f1)
+    if [[ "$rows" =~ ^[0-9]+$ ]]; then
+      printf '%*s' "$rows" '' | tr ' ' '\n'; printf '\033[H\033[J'; ANIM=1
+    fi
+  fi
   printf '\n'
-  printf '      %s▄█████▄%s\n' "$a" "$o"
-  printf '     %s██%s ▀▀▀ %s██%s     %smonica-server-stack%s\n' "$a" "$b" "$a" "$o" "$C_B" "$o"
-  printf '     %s██%s ▄▄▄ %s██%s     %sMonica, the personal CRM, on a server,%s\n' "$a" "$b" "$a" "$o" "$C_DIM" "$o"
-  printf '      %s▀█████▀%s      %swith an MCP server for AI tools%s\n' "$a" "$o" "$C_DIM" "$o"
+  banner_rows 0
+}
+
+# The arrows go round while the installer waits (a question, a step, a
+# download), for as long as the banner is on screen: before each wait the
+# terminal reports the cursor's row, and once output has reached the bottom
+# (the next line scrolls the banner) they stop for good. Frames are drawn at
+# the banner's fixed rows, saving and restoring the cursor, straight to the
+# terminal (prompts can run inside $(...)).
+ANIM="" ANIM_PID=""
+anim_on() {
+  [ -n "$ANIM" ] && [ -z "$ANIM_PID" ] || return 0
+  local rows row _ tty
+  rows=$(stty size </dev/tty 2>/dev/null | cut -d' ' -f1)
+  # echo off first: the reply can arrive before read starts, and would show
+  tty=$(stty -g </dev/tty 2>/dev/null) && stty -echo </dev/tty 2>/dev/null
+  printf '\033[6n' >/dev/tty
+  IFS='[;' read -rs -d R -t 0.5 _ row _ </dev/tty 2>/dev/null
+  [ -n "$tty" ] && stty "$tty" </dev/tty 2>/dev/null
+  if ! [[ "$rows" =~ ^[0-9]+$ && "$row" =~ ^[0-9]+$ ]] || [ "$row" -ge "$rows" ]; then
+    ANIM=""; return 0
+  fi
+  (
+    trap 'exit 0' TERM
+    local k=0 n=${#BN_RING[@]}
+    while :; do
+      k=$(((k + BN_STEP) % n))
+      printf '\x1b7\033[%d;1H%s\x1b8' "$BN_TOP" "$(banner_rows "$k")" >/dev/tty
+      sleep 0.1
+    done
+  ) &
+  ANIM_PID=$!
+}
+# Stop going round, back on the logo (the banner hasn't moved: anim_on checked).
+anim_off() {
+  [ -n "$ANIM_PID" ] || return 0
+  anim_stop
+  printf '\x1b7\033[%d;1H%s\x1b8' "$BN_TOP" "$(banner_rows 0)" >/dev/tty
+}
+anim_stop() {
+  [ -n "$ANIM_PID" ] || return 0
+  kill "$ANIM_PID" 2>/dev/null; wait "$ANIM_PID" 2>/dev/null; ANIM_PID=""
 }
 
 usage() {
@@ -316,7 +418,7 @@ choose_https() {
   ${C_ACC}2${C_0}  ${C_B}A domain, with HTTPS${C_0}     Caddy and Let's Encrypt; the domain must point here
   ${C_ACC}3${C_0}  ${C_B}Tailscale${C_0}                https://<name>.<tailnet>.ts.net, private to a tailnet
   ${C_ACC}4${C_0}  ${C_B}Cloudflare Tunnel${C_0}        a domain on Cloudflare, no open ports
-  ${C_ACC}5${C_0}  ${C_B}An existing reverse proxy${C_0} it forwards a domain to this machine
+  ${C_ACC}5${C_0}  ${C_B}A reverse proxy${C_0}          one already running here forwards a domain
 
 EOM
   ask "Choice [1]: " choice https
@@ -388,7 +490,8 @@ cmd_install() {
     email="$(env_get MONICA_EMAIL)"
     if [ -z "$email" ]; then need email "the account's email"; ask "Email (the login): " email email; fi
     [[ "$email" == *@*.* ]] || die "that doesn't look like an email address"
-    ask "Your name [$(env_get MONICA_NAME)]: " name name
+    local cur_name; cur_name="$(env_get MONICA_NAME)"
+    ask "Your name${cur_name:+ [$cur_name]}: " name name
     pw="$(env_get MONICA_PASSWORD)"
     [ -n "$pw" ] || pw="$PRESET_PASSWORD"
     if [ -z "$pw" ]; then
@@ -455,7 +558,7 @@ offer_link() {
   local name ans; name="monica-stack${P:+-${P%-}}"
   [ "$(readlink -f "/usr/local/bin/$name" 2>/dev/null)" = "$ROOT/monica-stack" ] && return 0
   echo; ask "Add a '$name' command (/usr/local/bin) to manage this install? [Y/n] " ans
-  case "$ans" in [nN]*) ;; *) cmd_link "$name" ;; esac
+  case "$ans" in [nN]*) ;; *) cmd_link "$name" && ME="$name" ;; esac
 }
 
 cmd_link() {

@@ -1,9 +1,17 @@
-# Monica Server Stack
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.gif">
+    <img src="assets/logo-light.gif" alt="Monica Server Stack logo" width="90">
+  </picture>
+</p>
 
-Self-hosted [Monica](https://www.monicahq.com) 4 with an [MCP server](https://github.com/Jacob-Stokes/monica-mcp), in one Docker Compose project.
+<h1 align="center">Monica Server Stack</h1>
 
-[![e2e](https://github.com/Jacob-Stokes/monica-server-stack/actions/workflows/e2e.yml/badge.svg)](https://github.com/Jacob-Stokes/monica-server-stack/actions/workflows/e2e.yml)
+<p align="center">Self-hosted <a href="https://www.monicahq.com">Monica</a> 4 with an <a href="https://github.com/Jacob-Stokes/monica-mcp">MCP server</a>, in one Docker Compose project.</p>
 
+<p align="center">
+  <a href="https://github.com/Jacob-Stokes/monica-server-stack/actions/workflows/e2e.yml"><img src="https://github.com/Jacob-Stokes/monica-server-stack/actions/workflows/e2e.yml/badge.svg" alt="e2e"></a>
+</p>
 
 | Service | |
 |---|---|
@@ -25,6 +33,10 @@ git clone https://github.com/Jacob-Stokes/monica-server-stack.git
 cd monica-server-stack
 ./install.sh
 ```
+
+<p align="center">
+  <img src="assets/installer.gif" alt="monica-stack installing Monica and its MCP server, sped up" width="720">
+</p>
 
 The installer asks for the account (email, name, password), timezone and currency, how to reach Monica (this machine only, a domain with HTTPS, Tailscale, a Cloudflare Tunnel, or an existing reverse proxy), and optional email settings for reminders. It writes `.env`, starts everything with `docker compose up -d`, and prints Monica's address and the MCP server's endpoint. It also offers to put a `monica-stack` command on the PATH.
 
