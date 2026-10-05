@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Keeps the pinned images and monica-mcp current; each pull request is tested by .github/workflows/e2e.yml.",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["docker-compose", "custom.regex"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "monica-mcp, built from its release tag",
+      "managerFilePatterns": ["/^compose\\.yml$/"],
+      "matchStrings": ["monica-mcp\\.git#v(?<currentValue>\\d+\\.\\d+\\.\\d+)", "monica-mcp:(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "Jacob-Stokes/monica-mcp",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    }
+  ],
+  "packageRules": [
+    { "matchDepNames": ["Jacob-Stokes/monica-mcp"], "groupName": "monica-mcp" },
+    { "description": "Monica 4 is the classic line; 5 is a separate rewrite", "matchPackageNames": ["monica"], "allowedVersions": "<5" },
+    { "description": "MariaDB: stay on the 11.4 LTS line", "matchPackageNames": ["mariadb"], "allowedVersions": "/^11\\.4/" }
+  ]
+}

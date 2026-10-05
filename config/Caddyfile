@@ -1,0 +1,15 @@
+# Monica at https://{$DOMAIN}/, its MCP server at /mcp (and the OAuth
+# metadata it publishes). Certificates from Let's Encrypt.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	@mcp path /mcp /mcp/* /.well-known/oauth-protected-resource
+	handle @mcp {
+		reverse_proxy monica-mcp:8080
+	}
+	handle {
+		reverse_proxy monica:80
+	}
+}

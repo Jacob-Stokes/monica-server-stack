@@ -1,0 +1,12 @@
+{
+  "TCP": { "443": { "HTTPS": true } },
+  "Web": {
+    "${TS_CERT_DOMAIN}:443": {
+      "Handlers": {
+        "/": { "Proxy": "http://monica:80" },
+        "/mcp": { "Proxy": "http://monica-mcp:8080/mcp" },
+        "/.well-known/oauth-protected-resource": { "Proxy": "http://monica-mcp:8080/.well-known/oauth-protected-resource" }
+      }
+    }
+  }
+}

@@ -1,0 +1,190 @@
+# Monica Server Stack: Monica 4, its scheduler, MariaDB and an MCP server,
+# as one compose project. `docker compose up -d` with a filled-in .env is a
+# complete install: monica-setup creates the first account and the MCP's API
+# token on the first run, and does nothing (or renews the token) after.
+# All data is in ./data. See README.md.
+
+name: ${INSTANCE_PREFIX:-}monica
+
+x-monica-env: &monica-env
+  APP_ENV: production
+  APP_KEY: ${APP_KEY:?Set APP_KEY in .env (./monica-stack install generates it)}
+  APP_URL: ${APP_URL:-http://localhost:8080}
+  APP_TRUSTED_PROXIES: "*"
+  APP_DISABLE_SIGNUP: "true"
+  DB_HOST: monica-db
+  DB_DATABASE: monica
+  DB_USERNAME: monica
+  DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+  # API requests a minute; Monica's default of 60 is tight for an assistant
+  RATE_LIMIT_PER_MINUTE_API: ${RATE_LIMIT_PER_MINUTE_API:-600}
+  MAIL_MAILER: ${MAIL_MAILER:-log}
+  MAIL_HOST: ${MAIL_HOST:-}
+  MAIL_PORT: ${MAIL_PORT:-587}
+  MAIL_USERNAME: ${MAIL_USERNAME:-}
+  MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+  MAIL_ENCRYPTION: ${MAIL_ENCRYPTION:-tls}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
+  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Monica}
+
+services:
+  monica:
+    image: monica:4.1.2-apache
+    container_name: ${INSTANCE_PREFIX:-}monica
+    restart: unless-stopped
+    environment: *monica-env
+    # any other Monica setting (see Monica's .env.example), optional
+    env_file:
+      - path: monica.env
+        required: false
+    ports:
+      - "${MONICA_BIND:-127.0.0.1:8080}:80"
+    volumes:
+      - ./data/storage:/var/www/html/storage
+    depends_on:
+      monica-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # Monica's scheduler: sends reminders by email and runs periodic jobs
+  monica-cron:
+    image: monica:4.1.2-apache
+    container_name: ${INSTANCE_PREFIX:-}monica-cron
+    restart: unless-stopped
+    command: cron.sh
+    environment: *monica-env
+    env_file:
+      - path: monica.env
+        required: false
+    volumes:
+      - ./data/storage:/var/www/html/storage
+    depends_on:
+      monica:
+        condition: service_healthy
+
+  monica-db:
+    image: mariadb:11.4
+    container_name: ${INSTANCE_PREFIX:-}monica-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: monica
+      MARIADB_USER: monica
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MARIADB_RANDOM_ROOT_PASSWORD: "true"
+    volumes:
+      - ./data/db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # One-shot, on every `up`: creates the first account (from MONICA_EMAIL and
+  # MONICA_PASSWORD) if there's none, and an API token for the MCP in
+  # data/mcp/token if there's no valid one; renews it when it nears expiry.
+  monica-setup:
+    image: monica:4.1.2-apache
+    container_name: ${INSTANCE_PREFIX:-}monica-setup
+    restart: "no"
+    entrypoint: ["php", "/setup/setup.php"]
+    working_dir: /var/www/html
+    environment:
+      <<: *monica-env
+      MONICA_EMAIL: ${MONICA_EMAIL:-}
+      MONICA_PASSWORD: ${MONICA_PASSWORD:-}
+      MONICA_NAME: ${MONICA_NAME:-}
+      MONICA_CURRENCY: ${MONICA_CURRENCY:-}
+      MONICA_SETUP_ROTATE: ${MONICA_SETUP_ROTATE:-}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./setup:/setup:ro
+      - ./data/storage:/var/www/html/storage
+      - ./data/mcp:/data/mcp
+    depends_on:
+      monica:
+        condition: service_healthy
+
+  # monica-mcp (github.com/Jacob-Stokes/monica-mcp), built from its release
+  # tag: Streamable HTTP at /mcp, bearer token (MCP_BEARER_TOKEN) or OAuth.
+  monica-mcp:
+    build: https://github.com/Jacob-Stokes/monica-mcp.git#v2.1.1
+    image: ${INSTANCE_PREFIX:-}monica-mcp:2.1.1
+    container_name: ${INSTANCE_PREFIX:-}monica-mcp
+    restart: unless-stopped
+    environment:
+      MCP_TRANSPORT: http
+      PORT: 8080
+      MONICA_BASE_URL: http://monica
+      MONICA_API_TOKEN_FILE: /data/mcp/token
+      MCP_BEARER_TOKEN: ${MCP_BEARER_TOKEN:?Set MCP_BEARER_TOKEN in .env}
+      MCP_OAUTH_ISSUER: ${MCP_OAUTH_ISSUER:-}
+      MCP_OAUTH_CANONICAL_URL: ${MCP_OAUTH_CANONICAL_URL:-}
+      MCP_OAUTH_AUDIENCE: ${MCP_OAUTH_AUDIENCE:-}
+    ports:
+      - "${MCP_BIND:-127.0.0.1:7011}:8080"
+    volumes:
+      - ./data/mcp:/data/mcp:ro
+    depends_on:
+      monica-setup:
+        condition: service_completed_successfully
+
+  # --- optional HTTPS: one of these profiles (COMPOSE_PROFILES in .env) ------
+  # Monica at https://<domain>/ and the MCP at https://<domain>/mcp.
+
+  # A domain pointing at this server, with certificates from Let's Encrypt
+  caddy:
+    image: caddy:2.10
+    container_name: ${INSTANCE_PREFIX:-}monica-caddy
+    profiles: [caddy]
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data
+    depends_on:
+      monica:
+        condition: service_healthy
+
+  # Private to a tailnet: https://<TS_HOSTNAME>.<tailnet>.ts.net
+  tailscale:
+    image: tailscale/tailscale:v1.88
+    container_name: ${INSTANCE_PREFIX:-}monica-tailscale
+    profiles: [tailscale]
+    restart: unless-stopped
+    hostname: ${TS_HOSTNAME:-monica}
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "true"
+      TS_ACCEPT_DNS: "false"
+    volumes:
+      - ./data/tailscale:/var/lib/tailscale
+      - ./config/ts-serve.json:/config/serve.json:ro
+    depends_on:
+      monica:
+        condition: service_healthy
+
+  # A Cloudflare Tunnel (no open ports); its routes are set in Cloudflare:
+  # <domain> → http://monica:80 and <domain>/mcp → http://monica-mcp:8080
+  cloudflared:
+    image: cloudflare/cloudflared:2025.9.1
+    container_name: ${INSTANCE_PREFIX:-}monica-cloudflared
+    profiles: [cloudflare]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN:-}
+    depends_on:
+      monica:
+        condition: service_healthy

@@ -1,0 +1,25 @@
+name: e2e
+
+# Install with plain Compose, run every monica-mcp tool against it, exercise
+# the CLI (status, token, backup and restore), install again with the
+# installer, uninstall: scripts/test-e2e.sh.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sudo bash scripts/test-e2e.sh
