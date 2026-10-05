@@ -13,6 +13,8 @@
   <a href="https://github.com/Jacob-Stokes/monica-server-stack/actions/workflows/e2e.yml"><img src="https://github.com/Jacob-Stokes/monica-server-stack/actions/workflows/e2e.yml/badge.svg" alt="e2e"></a>
 </p>
 
+> The MCP server is [monica-mcp](https://github.com/Jacob-Stokes/monica-mcp), which also runs on its own against any Monica 4 instance, including monicahq.com.
+
 | Service | |
 |---|---|
 | `monica` | Monica 4.1.2, the classic version's latest release (pinned) |
