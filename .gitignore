@@ -2,3 +2,5 @@ data/
 backups/
 .env
 monica.env
+docker-compose.override.yml
+compose.override.yml

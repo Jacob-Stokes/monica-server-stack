@@ -74,6 +74,10 @@ The installer sets `COMPOSE_PROFILES` and `APP_URL`; Monica builds its links fro
 
 `monica-stack update` pulls this repository and rebuilds. Monica stays on 4.1.2 until a pin in `compose.yml` changes, as Monica 4's last stable release; Monica 5 is a separate rewrite, still in beta, with a different API. [Renovate](https://docs.renovatebot.com) proposes new versions of the pinned images and of monica-mcp, each tested by the end-to-end test.
 
+## Local changes
+
+Additions for one server (an extra network, another port, labels) go in `compose.override.yml` next to `compose.yml`: Compose merges it automatically, git ignores it, and `monica-stack update` leaves it alone. Monica settings that `compose.yml` doesn't pass go in `monica.env` (see [Monica's `.env.example`](https://github.com/monicahq/monica/blob/4.x/.env.example)).
+
 ## Running a second copy
 
 Set `INSTANCE_PREFIX` (e.g. `test-`) and different `MONICA_BIND` and `MCP_BIND` in its `.env`; its containers get the prefix and its command is `monica-stack-test`.
