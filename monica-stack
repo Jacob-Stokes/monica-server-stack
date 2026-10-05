@@ -701,7 +701,7 @@ cmd_uninstall() {
   info "Stops and removes this install's containers. Data stays in data/ unless chosen."
   if [ -z "$NONINTERACTIVE" ]; then ask "Continue? [y/N] " ans; case "$ans" in [yY]*) ;; *) info "Nothing removed."; return ;; esac; fi
   dc down --remove-orphans >/dev/null 2>&1 && ok "Removed the containers"
-  docker image rm "${P}monica-mcp:2.1.1" >/dev/null 2>&1 || true
+  docker image rm "${P}monica-mcp:$(sed -n 's/^ *image: .*monica-mcp:\([^ ]*\).*/\1/p' compose.yml | head -1)" >/dev/null 2>&1 || true
   for link in /usr/local/bin/*; do [ -L "$link" ] && [ "$(readlink -f "$link")" = "$ROOT/monica-stack" ] && rm -f "$link" && ok "Removed command $(basename "$link")"; done
   if [ -z "$NONINTERACTIVE" ]; then
     ask "Type 'delete' to delete all data (database, files, .env), or Enter to keep it: " del
